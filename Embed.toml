@@ -2,4 +2,4 @@
 chip = "STM32F101C8"
 
 [default.rtt]
-enabled = false
+enabled = true
