@@ -39,7 +39,7 @@ fn main() -> ! {
     // configure the use of the external 8 MHz crystal
     let mut flash = peripherals.FLASH.constrain();
     let rcc = peripherals.RCC.constrain();
-    let clocks = rcc.cfgr.use_hse(8.MHz()).freeze(&mut flash.acr);
+    let clocks = rcc.cfgr.use_hse(8000.kHz()).freeze(&mut flash.acr);
 
     //config PB8 and PB9 as I2C
     let mut gpiob = peripherals.GPIOB.split();
@@ -79,26 +79,28 @@ fn main() -> ! {
     // rprintln!("crc: {:X}", crc);
 
     loop {
+        let timestamp = cortex_m::peripheral::DWT::cycle_count();
+
         // once per second, send the "measure_iaq" command
         let cmd = SensorCommand::MeasureAirQuality;
         let write_res = i2c.write(DEVICE_ADDRESS, &cmd.to_command());
         // wait at least 12 ms for the data to be ready, then read the 6 byte response
         asm::delay(12 * 8 * 1_000);
-        let mut data = [0u8; 3];
+        let mut data = [0u8; 6];
         let read_res = i2c.read(DEVICE_ADDRESS, &mut data);
-        let crc = crc8(&data[0..data.len() - 1]);
+        let crc: [u8; 2] = [crc8(&data[0..2]), crc8(&data[3..5])];
         rprintln!("write_res: {:?}", write_res);
         rprintln!("read_res: {:?}", read_res);
-        rprintln!("data: {:X?} crc: {:X}", data, crc);
-
+        rprintln!("data: {:X?} crc: {:X?}", data, crc);
         // turn the first two bytes into a u16
         let co2 = ((data[0] as u16) << 8) | (data[1] as u16);
-        rprintln!("co2: {}", co2);
-
-        // convert
+        let voc = ((data[3] as u16) << 8) | (data[4] as u16);
+        rprintln!("co2: {} voc: {}", co2, voc);
 
         // wait 1 second
-        asm::delay(8 * 1_000_000);
+        let delay_left = 5_600_000 - (cortex_m::peripheral::DWT::cycle_count() - timestamp);
+        asm::delay(delay_left as u32);
+        // asm::delay(8 * 1_000_000);
 
         // toggle the LED state
         // led.toggle();
