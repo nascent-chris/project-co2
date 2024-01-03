@@ -12,7 +12,7 @@ use panic_semihosting as _;
 use cortex_m::asm;
 use cortex_m_rt::entry;
 use stm32f1xx_hal::{
-    i2c::{self, BlockingI2c, DutyCycle, Mode},
+    i2c::{BlockingI2c, DutyCycle, Mode},
     pac,
     prelude::*,
 };
@@ -64,53 +64,64 @@ fn main() -> ! {
     // sleep for 1/2 second to let the sensor warm up
     asm::delay(4 * 1_000_000);
 
+    let cmd = SensorCommand::GetSerialId;
+    i2c.write(DEVICE_ADDRESS, &cmd.to_command())
+        .expect("write failed");
+
+    // wait for 0.5 ms for the data to be ready, then read the 3 byte response
+    asm::delay(500 * 8 * 1_000);
+    let mut read_buffer = [0u8; 6];
+    i2c.read(DEVICE_ADDRESS, &mut read_buffer)
+        .expect("read failed");
+
+    // verify CRC
+    let crc_valid = |b: &[u8]| b.chunks(3).all(|chunk| chunk[2] == crc8(&chunk[0..2]));
+    let crc_valid_str = |b: &[u8]| if crc_valid(b) { "OK" } else { "FAIL" };
+    let mut hex_output = [0u8; 6 * 2]; // buffer must be twice the size of the input
+    match to_hex_string(&read_buffer, &mut hex_output)
+        .and_then(|_| core::str::from_utf8(&hex_output).map_err(|_| "invalid utf8"))
+    {
+        Ok(s) => rprintln!("serial: {} crc ok: {}", s, crc_valid(&read_buffer)),
+        Err(e) => rprintln!("Error: {}", e),
+    }
+
     let cmd = SensorCommand::InitAirQuality;
 
-    let write_res = i2c.write(DEVICE_ADDRESS, &cmd.to_command());
-    rprintln!("write_res: {:?}", write_res);
-
-    // // wait for 0.5 ms for the data to be ready, then read the 3 byte response
-    // asm::delay(220 * 8 * 1_000);
-    // let mut data = [0u8; 3];
-    // let res = i2c.read(DEVICE_ADDRESS, &mut data);
-    // let crc = crc8(&data[0..data.len() - 1]);
-    // rprintln!("read: {:?}", res);
-    // rprintln!("data: {:00.X?}", data);
-    // rprintln!("crc: {:X}", crc);
+    i2c.write(DEVICE_ADDRESS, &cmd.to_command())
+        .expect("write failed");
 
     loop {
         let timestamp = cortex_m::peripheral::DWT::cycle_count();
 
         // once per second, send the "measure_iaq" command
         let cmd = SensorCommand::MeasureAirQuality;
-        let write_res = i2c.write(DEVICE_ADDRESS, &cmd.to_command());
+        i2c.write(DEVICE_ADDRESS, &cmd.to_command())
+            .expect("write failed");
+
         // wait at least 12 ms for the data to be ready, then read the 6 byte response
         asm::delay(12 * 8 * 1_000);
-        let mut data = [0u8; 6];
-        let read_res = i2c.read(DEVICE_ADDRESS, &mut data);
-        let crc: [u8; 2] = [crc8(&data[0..2]), crc8(&data[3..5])];
-        rprintln!("write_res: {:?}", write_res);
-        rprintln!("read_res: {:?}", read_res);
-        rprintln!("data: {:X?} crc: {:X?}", data, crc);
-        // turn the first two bytes into a u16
-        let co2 = ((data[0] as u16) << 8) | (data[1] as u16);
-        let voc = ((data[3] as u16) << 8) | (data[4] as u16);
+
+        i2c.read(DEVICE_ADDRESS, &mut read_buffer)
+            .expect("read failed");
+
+        // verify CRC
+        rprintln!(
+            "data: {:X?} crc: {}",
+            read_buffer,
+            crc_valid_str(&read_buffer)
+        );
+
+        let co2 = ((read_buffer[0] as u16) << 8) | (read_buffer[1] as u16);
+        let voc = ((read_buffer[3] as u16) << 8) | (read_buffer[4] as u16);
         rprintln!("co2: {} voc: {}", co2, voc);
 
         // wait 1 second
         let delay_left = 5_600_000 - (cortex_m::peripheral::DWT::cycle_count() - timestamp);
-        asm::delay(delay_left as u32);
-        // asm::delay(8 * 1_000_000);
+        asm::delay(delay_left);
 
         // toggle the LED state
         // led.toggle();
         led.set_high();
-
-        // wait for 125ms
-        // the external clock is 8MHz
-        // so 8_000_000 cycles = 1 second
-        // 1_000_000 cycles = 1/8 seconds = 125ms
-        // asm::delay(10 * 8 * 1_000_000);
     }
 }
 
@@ -133,6 +144,21 @@ fn crc8(data: &[u8]) -> u8 {
     }
     // No final XOR in this algorithm (Final XOR = 0x00)
     crc
+}
+
+fn to_hex_string(input: &[u8], output: &mut [u8]) -> Result<(), &'static str> {
+    const HEX_CHARS: [u8; 16] = *b"0123456789ABCDEF";
+
+    if output.len() < input.len() * 2 {
+        return Err("Output buffer is too small");
+    }
+
+    for (i, &byte) in input.iter().enumerate() {
+        output[i * 2] = HEX_CHARS[(byte >> 4) as usize];
+        output[i * 2 + 1] = HEX_CHARS[(byte & 0x0F) as usize];
+    }
+
+    Ok(())
 }
 
 /*
@@ -166,13 +192,15 @@ enum SensorCommand {
     GetSerialId = 0x3682,
 }
 
-impl SensorCommand {
-    fn to_bytes(&self) -> [u8; 2] {
-        [((*self as u16) >> 8) as u8, (*self as u16) as u8]
+impl From<SensorCommand> for [u8; 2] {
+    fn from(val: SensorCommand) -> Self {
+        [((val as u16) >> 8) as u8, (val as u16) as u8]
     }
+}
 
-    fn to_command(&self) -> [u8; 3] {
-        let bytes = self.to_bytes();
+impl SensorCommand {
+    fn to_command(self) -> [u8; 3] {
+        let bytes: [u8; 2] = self.into();
         [bytes[0], bytes[1], crc8(&bytes)]
     }
 }

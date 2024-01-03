@@ -6,11 +6,11 @@ name = "project-co2"
 version = "0.1.0"
 
 [dependencies]
-stm32f1xx-hal = { git = "https://github.com/nascent-chris/stm32f1xx-hal", branch = "chris/i2c-issue", features = [
-    "rt",
-    "stm32f103",
-] }
-# stm32f1xx-hal = { path = "../stm32f1xx-hal", features = ["rt", "stm32f103"] }
+# stm32f1xx-hal = { git = "https://github.com/nascent-chris/stm32f1xx-hal", branch = "chris/i2c-issue", features = [
+#     "rt",
+#     "stm32f103",
+# ] }
+stm32f1xx-hal = { path = "../stm32f1xx-hal", features = ["rt", "stm32f103"] }
 
 cortex-m = { version = "0.7", features = ["critical-section-single-core"] }
 cortex-m-rt = "0.7.1"
