@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+pub mod sgp30;
+
 // pick a panicking behavior
 // use panic_halt as _;
 use panic_semihosting as _;
