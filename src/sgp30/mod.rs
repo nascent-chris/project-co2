@@ -31,7 +31,7 @@ pub struct Sgp30<I2C> {
     address: u8,
 }
 
-pub struct CommandBuilder<
+struct CommandBuilder<
     'a,
     const PARAM_SIZE: usize,
     const RESPONSE_SIZE: usize,
@@ -69,26 +69,6 @@ where
         CommandBuilder {
             i2c: self.i2c,
             params: Some(params.into()),
-            code: self.code,
-        }
-    }
-
-    pub fn verify_response_crc(
-        self,
-    ) -> CommandBuilder<'a, PARAM_SIZE, RESPONSE_SIZE, true, BlockingI2c<I2C, PINS>> {
-        CommandBuilder {
-            i2c: self.i2c,
-            params: self.params,
-            code: self.code,
-        }
-    }
-
-    pub fn ignore_response_crc(
-        self,
-    ) -> CommandBuilder<'a, PARAM_SIZE, RESPONSE_SIZE, false, BlockingI2c<I2C, PINS>> {
-        CommandBuilder {
-            i2c: self.i2c,
-            params: self.params,
             code: self.code,
         }
     }
@@ -142,57 +122,43 @@ where
 
     /// Param length: 0 bytes, Response length: 0 bytes
     pub fn init_air_quality(&mut self) -> Result<(), Sgp30Error> {
-        CommandBuilder::<0, 0, true, _>::new(self, InitAirQuality)
-            .ignore_response_crc()
+        CommandBuilder::<0, 0, false, _>::new(self, InitAirQuality)
             .exec()
             .map(Into::into)
     }
 
     /// Param length: 0 bytes, Response length: 9 bytes
     pub fn get_serial_id(&mut self) -> Result<[u8; 9], Sgp30Error> {
-        CommandBuilder::<0, 9, true, _> {
-            i2c: self,
-            code: GetSerialId,
-            params: None,
-        }
-        .exec()?
-        .try_into()
+        CommandBuilder::<0, 9, true, _>::new(self, GetSerialId)
+            .exec()?
+            .try_into()
     }
 
     /// Param length: 0 bytes, Response length: 6 bytes
     pub fn measure_air_quality(&mut self) -> Result<(u16, u16), Sgp30Error> {
-        CommandBuilder::<0, 6, true, _> {
-            i2c: self,
-            code: MeasureAirQuality,
-            params: None,
-        }
-        .exec()?
-        .try_into()
+        CommandBuilder::<0, 6, true, _>::new(self, MeasureAirQuality)
+            .exec()?
+            .try_into()
     }
 
     /// Param length: 0 bytes, Response length: 6 bytes
     pub fn get_baseline(&mut self) -> Result<[u8; 6], Sgp30Error> {
-        CommandBuilder::<0, 6, true, _> {
-            i2c: self,
-            code: GetBaseline,
-            params: None,
-        }
-        .exec()?
-        .try_into()
+        CommandBuilder::<0, 6, true, _>::new(self, GetBaseline)
+            .exec()?
+            .try_into()
     }
 
     /// Param length: 6 bytes, Response length: 0 bytes
-    pub fn set_baseline(&mut self) -> Result<(), Sgp30Error> {
-        CommandBuilder::<6, 0, true, _>::new(self, SetBaseline)
-            .ignore_response_crc()
+    pub fn set_baseline(&mut self, params: impl Into<ParamBytes<6>>) -> Result<(), Sgp30Error> {
+        CommandBuilder::<6, 0, false, _>::new(self, SetBaseline)
+            .params(params)
             .exec()
             .map(Into::into)
     }
 
     /// Param length: 3 bytes, Response length: 0 bytes
     pub fn set_humidity(&mut self, params: impl Into<ParamBytes<3>>) -> Result<(), Sgp30Error> {
-        CommandBuilder::<3, 0, true, _>::new(self, SetHumidity)
-            .ignore_response_crc()
+        CommandBuilder::<3, 0, false, _>::new(self, SetHumidity)
             .params(params)
             .exec()
             .map(Into::into)
@@ -200,34 +166,22 @@ where
 
     /// Param length: 0 bytes, Response length: 3 bytes
     pub fn measure_test(&mut self) -> Result<[u8; 3], Sgp30Error> {
-        CommandBuilder::<0, 3, true, _> {
-            i2c: self,
-            code: MeasureTest,
-            params: None,
-        }
-        .exec()?
-        .try_into()
+        CommandBuilder::<0, 3, true, _>::new(self, MeasureTest)
+            .exec()?
+            .try_into()
     }
 
     /// Param length: 0 bytes, Response length: 3 bytes
     pub fn get_feature_set_ver(&mut self) -> Result<[u8; 3], Sgp30Error> {
-        CommandBuilder::<0, 3, true, _> {
-            i2c: self,
-            code: GetFeatureSetVer,
-            params: None,
-        }
-        .exec()?
-        .try_into()
+        CommandBuilder::<0, 3, true, _>::new(self, GetFeatureSetVer)
+            .exec()?
+            .try_into()
     }
 
     /// Param length: 0 bytes, Response length: 6 bytes
     pub fn measure_raw_signals(&mut self) -> Result<[u8; 6], Sgp30Error> {
-        CommandBuilder::<0, 6, true, _> {
-            i2c: self,
-            code: MeasureRawSignals,
-            params: None,
-        }
-        .exec()?
-        .try_into()
+        CommandBuilder::<0, 6, true, _>::new(self, MeasureRawSignals)
+            .exec()?
+            .try_into()
     }
 }

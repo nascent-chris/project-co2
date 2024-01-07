@@ -75,72 +75,54 @@ static COMMANDS: [Command; 9] = [
     // Init_air_quality
     Command {
         code: 0x2003,
-        // param_len: None,
-        // resp_len: None,
         duration_cycles: 2,
         max_duration_cycles: 10,
     },
     // Measure_air_quality
     Command {
         code: 0x2008,
-        // param_len: None,
-        // resp_len: Some(6),
         duration_cycles: 10,
         max_duration_cycles: 12,
     },
     // Get_baseline
     Command {
         code: 0x2015,
-        // param_len: None,
-        // resp_len: Some(6),
         duration_cycles: 10,
         max_duration_cycles: 10,
     },
     // Set_baseline
     Command {
         code: 0x201e,
-        // param_len: Some(6),
-        // resp_len: None,
         duration_cycles: 10,
         max_duration_cycles: 10,
     },
     // Set_humidity
     Command {
         code: 0x2061,
-        // param_len: Some(3),
-        // resp_len: None,
         duration_cycles: 1,
         max_duration_cycles: 10,
     },
     // Measure_test
     Command {
         code: 0x2032,
-        // param_len: None,
-        // resp_len: Some(3),
         duration_cycles: 200,
         max_duration_cycles: 220,
     },
     // Get_feature_set_ver
     Command {
         code: 0x202f,
-        // param_len: None,
-        // resp_len: Some(3),
         duration_cycles: 1,
         max_duration_cycles: 2,
     },
     // Measure_raw_signals
     Command {
         code: 0x2050,
-        // param_len: None,
-        // resp_len: Some(6),
         duration_cycles: 20,
         max_duration_cycles: 25,
     },
     // Get_serial_id
     Command {
         code: 0x3682,
-        // param_len: None,
-        // resp_len: Some(6),
         duration_cycles: 1,
         max_duration_cycles: 2,
     },
